@@ -1,0 +1,29 @@
+name: 4S
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - matplotlib
+  - h5py
+  - hdf5
+  - numpy
+  - opencv
+  - Pillow
+  - PyYAML
+  - requests
+  - scipy
+  - pandas
+  - seaborn
+  - psutil
+  - pytorch=2.0.0
+  - pytorch-cuda=11.7
+  - torchvision
+  - pip:
+      - thop
+      - huggingface-hub
+      - timm
+      - tqdm
+      - wandb
