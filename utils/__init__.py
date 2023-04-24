@@ -11,7 +11,8 @@ import cv2
 import torch
 from PIL import Image
 
-from ultralytics import YOLO
+from ultralytics import YOLO  # noqa
+from ultralytics.yolo.utils.plotting import colors  # noqa
 from zoedepth.utils.misc import colorize  # noqa
 
 output_prefix = Path('outputs')
@@ -28,9 +29,9 @@ class Detection:
             self.save()
         return self.result
 
-    def plot(self):
+    def plot(self, label=True):
         assert self.result is not None, 'prediction does not exist'
-        return self.result.plot()
+        return self.result.plot(labels=label)
 
     def save(self):
         assert self.result is not None, 'prediction does not exist'
@@ -88,13 +89,20 @@ def parse_args():
     return args
 
 
-def save_images(name, images, src):
+def save_image(image, f_name):
+    name = Path(f_name).stem
+    cv2.imwrite(str(output_prefix / f_name), image)
+    print(f'{name} result saved as `{f_name}`')
+
+
+def save_images(name, images):
     classes = defaultdict(int)
     for img in images:
         c = img['cls']
         classes[c] += 1
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_origin.png'), img['original_img'])
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_depth.png'), img['depth_img'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_mask.png'), img['mask'])
 
 
-__all__ = 'Detection', 'Depth', 'Image', 'parse_args', 'save_images'
+__all__ = 'Detection', 'Depth', 'parse_args', 'save_images', 'save_image', 'colors'
