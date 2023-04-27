@@ -15,6 +15,10 @@ __pycache__/
 *.pth
 *.pt
 outputs/
+datasets/input/
+datasets/output/
+datasets/VOC2012/
+
 
 # Distribution / packaging
 .Python
