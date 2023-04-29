@@ -76,7 +76,7 @@ class Depth:
 def parse_args():
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--source', default='assets/Puppies.jpg', help='source')
-    parser.add_argument('--od', default='yolov8x', help='object detection model')
+    parser.add_argument('--od', default='model/yolov8x-voc-best.pt', help='object detection model')
     parser.add_argument('--de', default='ZoeD_N', help='depth estimation model')
     parser.add_argument('--save', action='store_true', help='save results')
 
@@ -103,6 +103,12 @@ def save_images(name, images):
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_origin.png'), img['original_img'])
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_depth.png'), img['depth_img'])
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_mask.png'), img['mask'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_gray.png'), img['gray'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_blur.png'), img['blur'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_thresh_image.png'), img['thresh_image'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_edge.png'), img['edge'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_closed_edge.png'), img['closed_edge'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_contours_image.png'), img['contours_image'])
 
 
 __all__ = 'Detection', 'Depth', 'parse_args', 'save_images', 'save_image', 'colors'
