@@ -10,6 +10,8 @@ class Model:
         self.save = args.save
         self.colors = colors
 
+        self.point_interval = 20
+
         self.names = None
         self.original_img = None
         self.gray_image = None
@@ -49,15 +51,6 @@ class Model:
 
     def preprocess(self):
         self.original_img = self.detection.result.orig_img
-        # self.gray_image = cv2.cvtColor(self.original_img, cv2.COLOR_BGR2GRAY)
-        # self.blur_image = cv2.GaussianBlur(self.gray_image, ksize=(5, 5), sigmaX=0)
-        # _, self.thresh_image = cv2.threshold(self.blur_image, 127, 255, cv2.THRESH_BINARY)
-        # self.edge = cv2.Canny(self.blur_image, 10, 250)
-        # kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
-        # self.closed_edge_image = cv2.morphologyEx(self.edge, cv2.MORPH_CLOSE, kernel)
-        # contours, _ = cv2.findContours(self.closed_edge_image.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        # self.contours_image = cv2.drawContours(self.original_img, contours, -1, (0, 255, 0), 3)
-
         processing_image = cv2.cvtColor(self.depth.plot(), cv2.COLOR_BGRA2GRAY)
         height, width = processing_image.shape
         kernel = np.zeros((height, width))
@@ -67,35 +60,78 @@ class Model:
         normalized_depth = processing_image - kernel
         normalized_depth = normalized_depth.clip(min=0, max=255)
         self.processing_image = normalized_depth
+        # for p in normalized_depth.astype(np.uint8):
+        #     for q in p:
+        #         if q > 99:
+        #             print('---',end=' ')
+        #         else:
+        #             z = str(q).zfill(3)
+        #
+        #             # print(str(q).rjust(3, ' '), end='')
+        #
+        #             print('   ' if z == '000' else z, end=' ')
+        #     print()
 
     def postprocess(self):
         for image in self.crop_images:
             cls = image['cls']
             color = self.colors(cls, True)
+            depth_img = image['depth_img'].copy().astype(np.uint8)
+            h, w = depth_img.shape
+            indices = np.array(
+                [[i, j] for i in range(self.point_interval, h - self.point_interval, self.point_interval) for j in
+                 range(self.point_interval, w - self.point_interval, self.point_interval)])
+            bgd_model = np.zeros((1, 65), np.float64)  # 배경 모델 무조건 1행 65열, float64
+            fgd_model = np.zeros((1, 65), np.float64)  # 전경 모델 무조건 1행 65열,
 
-            threshold = int(image['depth_value'] * 0.8)  # <Param 2> Default : 0.5
-            ret, output = cv2.threshold(image['depth_img'], threshold, 255, cv2.THRESH_BINARY)
-            image['mask'] = output
+            # _, mask = cv2.threshold(depth_img, 1, 255, cv2.THRESH_BINARY)
+            # mask[mask == 255] = 1
 
-            gray = cv2.cvtColor(image['original_img'], cv2.COLOR_BGR2GRAY)
-            image['gray'] = gray
-            blur = cv2.GaussianBlur(gray, ksize=(5, 5), sigmaX=0)
-            image['blur'] = blur
-            _, thresh_image = cv2.threshold(blur, 127, 255, cv2.THRESH_BINARY)
-            image['thresh_image'] = thresh_image
-            edge = cv2.Canny(blur, 10, 250)
-            image['edge'] = edge
-            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
-            closed_edge = cv2.morphologyEx(edge, cv2.MORPH_CLOSE, kernel)
-            image['closed_edge'] = closed_edge
-            contours, _ = cv2.findContours(closed_edge, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            contours_image = cv2.drawContours(image['original_img'], contours, -1, color, 3)
-            image['contours_image'] = contours_image
+            mask = np.zeros_like(depth_img, np.uint8)
+            depth_img = cv2.cvtColor(depth_img, cv2.COLOR_GRAY2BGR)
+            rc = (1, 1, w - 1, h - 1)
+            cv2.grabCut(depth_img, mask, rc, bgd_model, fgd_model, 1, cv2.GC_INIT_WITH_RECT)
+            mask2 = np.where((mask == 0) | (mask == 2), 0, 1).astype('uint8')
+            depth_img = depth_img * mask2[:, :, np.newaxis]
+            depth_img = cv2.cvtColor(depth_img, cv2.COLOR_BGRA2GRAY)
 
-        # cv2.imwrite('canny.png', cv2.Canny(cv2.imread('cat_0001_depth.png'), 30, 30))
-        # cv2.imwrite('canny.png', cv2.Canny(cv2.imread('normalized_depth_output.png'), 30, 30))
-        # cv2.imwrite('canny_origin.png', cv2.Canny(cv2.imread('cat_0001_origin.png'), 150, 150))
-        # cv2.imwrite('add.png', cv2.addWeighted(cv2.imread('canny_whole.png'), 1, cv2.imread('masking_image.png'), 1, 0))
+            # proc_coords = []
+            for i in range(1, 20):
+                pointed_depth_img = depth_img[indices[:, 0], indices[:, 1]]
+
+                p_max = indices[
+                    np.argwhere(pointed_depth_img == np.max(pointed_depth_img[pointed_depth_img != 255], axis=0))]
+                p_min = indices[
+                    np.argwhere(pointed_depth_img == np.min(pointed_depth_img[pointed_depth_img != 0], axis=0))]
+
+                for y, x in p_max[0]:
+                    # if [y,x] not in proc_coords:
+                    cv2.circle(mask, (x, y), 3, cv2.GC_FGD, -1)
+                    # proc_coords.append([y,x])
+                    cv2.circle(depth_img, (x, y), 3, 255, -1)
+                for y, x in p_min[0]:
+                    # if [y, x] not in proc_coords:
+                    cv2.circle(mask, (x, y), 3, cv2.GC_BGD, -1)
+                    # proc_coords.append([y, x])
+                    cv2.circle(depth_img, (x, y), 3, 0, -1)
+
+                depth_img = cv2.cvtColor(depth_img, cv2.COLOR_GRAY2BGR)
+                cv2.grabCut(depth_img, mask, rc, bgd_model, fgd_model, 1, cv2.GC_INIT_WITH_MASK)
+                # mask2 = np.where((mask == 1) + (mask == 3), 255, 0).astype(np.uint8)
+                mask2 = np.where((mask == 0) + (mask == 2), 0, 1).astype(np.uint8)
+                depth_img = depth_img * mask2[:, :, np.newaxis]
+                depth_img = cv2.cvtColor(depth_img, cv2.COLOR_BGRA2GRAY)
+                # depth_img = cv2.bitwise_and(depth_img, mask2)
+
+                cv2.imwrite(f'pointed_depth_img-{i}.png', depth_img)
+
+                _, mask3 = cv2.threshold(depth_img, 1, 255, cv2.THRESH_BINARY)
+                cv2.imwrite(f'mask-{i}.png', mask3)
+                # mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+                # mask[mask == 255] = 1
+
+            mask[mask == 1] = 255
+            image['mask'] = mask
 
     def ordered_paint(self):
         canvas = self.detection.plot(label=False)
