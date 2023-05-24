@@ -102,13 +102,15 @@ def save_images(name, images):
         classes[c] += 1
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_origin.png'), img['original_img'])
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_depth.png'), img['depth_img'])
-        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_mask.png'), img['mask'])
-        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_gray.png'), img['gray'])
-        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_blur.png'), img['blur'])
-        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_thresh_image.png'), img['thresh_image'])
-        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_edge.png'), img['edge'])
-        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_closed_edge.png'), img['closed_edge'])
-        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_contours_image.png'), img['contours_image'])
+        # cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_normalized_depth.png'), img['normalized_depth'])
+        # cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_mask.png'), img['mask'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_G_blur.png'), img['G_blur'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_K_blur.png'), img['K_blur'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_fusion.png'), img['fusion'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_normalized_fusion.png'), img['normalized_fusion'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_fusion_mean_masking.png'), img['fusion_mean_masking'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_KMean.png'), img['F_KMean'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_GMM.png'), img['F_GMM'])
 
 
 __all__ = 'Detection', 'Depth', 'parse_args', 'save_images', 'save_image', 'colors'
