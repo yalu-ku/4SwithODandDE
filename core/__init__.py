@@ -129,18 +129,19 @@ class Model:
     def postprocess(self):
         for image in self.crop_images:
             # 이미지의 높이와 너비를 가져옵니다.
-            height = image['depth_img'].shape[0]
-            width = image['depth_img'].shape[1]
 
-            canvas = np.full((height, width, 2), (0, 0), dtype=np.uint8)
+            height = image['original_img'].shape[0]
+            width = image['original_img'].shape[1]
+
+            canvas = np.full((height, width, 3), (0, 0, 0), dtype=np.uint8)
 
             # print(f"image['depth_img'] : {image['depth_img'].shape}")
             # print(f"image['gray_img'] : {image['gray_img'].shape}")
             # print(f"canvas : {canvas.shape}")
 
-            canvas[:, :, 0] = image['depth_img'].copy()
+            canvas[:, :] = image['original_img'].copy()
             # cv2.imwrite('depth.png', image['depth_img'])
-            canvas[:, :, 1] = image['gray_img'].copy()
+            # canvas[:, :, 1] = image['gray_img'].copy()
             # cv2.imwrite('gray.png', image['gray_img'])
 
             # KMeans 클러스터링 모델을 초기화합니다.
@@ -148,8 +149,8 @@ class Model:
             gmm = GaussianMixture(n_components=3)
 
             # 이미지의 픽셀을 클러스터링합니다.
-            km_cluster_labels = kmeans.fit_predict(canvas.reshape(-1, 2))
-            gmm_cluster_labels = gmm.fit_predict(canvas.reshape(-1, 2))
+            km_cluster_labels = kmeans.fit_predict(canvas.reshape(-1, 3))
+            gmm_cluster_labels = gmm.fit_predict(canvas.reshape(-1, 3))
 
             # # 클러스터 레이블을 사용하여 군집화된 이미지를 만듭니다.
             km_clustered_image = np.zeros((height, width), dtype=np.uint8)
@@ -199,18 +200,34 @@ class Model:
 
             image['fusion'] = fusion_img.copy().clip(min=0, max=255).astype(np.uint8)
 
-            fusion_img = ((fusion_img - fusion_img.min()) / (fusion_img.max() - fusion_img.min()) * 255).astype(np.uint8)
+            fusion_img = ((fusion_img - fusion_img.min()) / (fusion_img.max() - fusion_img.min()) * 255).astype(
+                np.uint8)
 
             image['normalized_fusion'] = fusion_img.copy()
 
             # image['fusion_mean_masking'] = fusion_img[fusion_img > fusion_img.mean()]
             image['fusion_mean_masking'] = np.where(fusion_img > fusion_img.mean(), fusion_img, 0)
 
+            image['fmm_depth_fusion'] = (
+                    image['fusion_mean_masking'].copy().astype(int) + image['depth_img'].copy().astype(int)).clip(
+                min=0, max=255).astype(np.uint8)
+
+            # print(f"image['fusion_mean_masking'] : {type(image['fusion_mean_masking'])}")
+            # print(f"image['fusion_mean_masking'][0,0] : {type(image['fusion_mean_masking'][0,0])}")
+            # print(f"image['depth_img'][0,0] : {type(image['depth_img'][0,0])}")
+
+            image['fmm_depth_fusion'] = cv2.addWeighted(image['fusion_mean_masking'].copy(), 0.35,
+                                                        image['depth_img'].copy().astype(np.uint8), 1, 0)
+
+            cv2.imwrite('fmm.png', image['fmm_depth_fusion'])
+
             ##############################################
 
-            # canvas = np.full((height, width, 2), (0, 0), dtype=np.uint8)
-            # canvas[:, :, 0] = km_clustered_image
-            # canvas[:, :, 1] = image['G_blur']
+            canvas = np.full((height, width), 0, dtype=np.uint8)
+            canvas[:, :] = image['fmm_depth_fusion'].copy()
+            # canvas[:, :] = image['fusion_mean_masking'].copy()
+
+            # canvas[:, :, 1] = image['depth_img'].copy()
             #
             # kmeans = KMeans(n_clusters=5, n_init='auto')
             # gmm = GaussianMixture(n_components=3)
@@ -221,8 +238,8 @@ class Model:
             kmeans = KMeans(n_clusters=2, n_init='auto')
             gmm = GaussianMixture(n_components=2)
 
-            km_cluster_labels = kmeans.fit_predict(image['fusion_mean_masking'].reshape(-1, 1))
-            gmm_cluster_labels = gmm.fit_predict(image['fusion_mean_masking'].reshape(-1, 1))
+            km_cluster_labels = kmeans.fit_predict(canvas.reshape(-1, 1))
+            gmm_cluster_labels = gmm.fit_predict(canvas.reshape(-1, 1))
 
             ###############################################
 
@@ -259,6 +276,18 @@ class Model:
             print('GMM', gv)
             image['F_GMM_mask'] = gv[-1:]
 
+            # fusion_img = image['K_blur'].astype(int) + image['G_blur'].astype(int)
+            #
+            # image['fusion'] = fusion_img.copy().clip(min=0, max=255).astype(np.uint8)
+            #
+            # fusion_img = ((fusion_img - fusion_img.min()) / (fusion_img.max() - fusion_img.min()) * 255).astype(
+            #     np.uint8)
+            #
+            # image['normalized_fusion'] = fusion_img.copy()
+            #
+            # # image['fusion_mean_masking'] = fusion_img[fusion_img > fusion_img.mean()]
+            # image['fusion_mean_masking'] = np.where(fusion_img > fusion_img.mean(), fusion_img, 0)
+
             # new_img = image['F_KMean'].astype(int) + image['G_blur'].astype(int)
 
             # image['fusion'] = new_img.copy().clip(min=0, max=255).astype(np.uint8)
@@ -266,7 +295,6 @@ class Model:
             # new_img = (new_img - new_img.min()) / (new_img.max() - new_img.min()) * 255
             #
             # image['normalized_fusion'] = new_img.astype(np.uint8)
-
 
             # gv = sorted(vals.keys())
             # image['F_GMM_g_max'] = gv[2:]
