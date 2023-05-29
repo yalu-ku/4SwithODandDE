@@ -2,31 +2,32 @@ import torch
 from torch.nn import *
 from torchvision.transforms import CenterCrop
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-class Model(Module):
+class UNet(Module):
     def __init__(self):
-        super().__init__()
+        super(UNet, self).__init__()
 
         # Contracting
         self.conv_1 = Sequential(
             self.cbr(3, 64),
-            self.cbr(64, 64, 3, 1))
+            self.cbr(64, 64))
         self.pool_1 = MaxPool2d(kernel_size=2, stride=2)
 
         self.conv_2 = Sequential(
             self.cbr(64, 128),
-            self.cbr(128, 128, 3, 1))
+            self.cbr(128, 128))
         self.pool_2 = MaxPool2d(kernel_size=2, stride=2)
 
         self.conv_3 = Sequential(
             self.cbr(128, 256),
-            self.cbr(256, 256, 3, 1))
+            self.cbr(256, 256))
         self.pool_3 = MaxPool2d(kernel_size=2, stride=2)
 
         self.conv_4 = Sequential(
             self.cbr(256, 512),
-            self.cbr(512, 512, 3, 1),
-            Dropout(p=0.5))
+            self.cbr(512, 512))
+            # Dropout(p=0.5))
         self.pool_4 = MaxPool2d(kernel_size=2, stride=2)
 
         # Bottle Neck
@@ -60,7 +61,7 @@ class Model(Module):
             self.cbr(64, 64)
         )
 
-        self.fc = Conv2d(64, 21, kernel_size=1, stride=1)
+        self.fc = Conv2d(64, 3, kernel_size=1, stride=1)
 
     def forward(self, x):
         layer_1 = self.pool_1(self.conv_1(x))
@@ -74,15 +75,15 @@ class Model(Module):
         cat_1 = torch.cat((CenterCrop((up_conv_5.shape[2], up_conv_5.shape[3]))(layer_4), up_conv_5), dim=1)
         layer_5 = self.conv_5(cat_1)
 
-        up_conv_6 = self.up_conv_5(layer_5)
+        up_conv_6 = self.up_conv_6(layer_5)
         cat_2 = torch.cat((CenterCrop((up_conv_6.shape[2], up_conv_6.shape[3]))(layer_3), up_conv_6), dim=1)
         layer_6 = self.conv_6(cat_2)
 
-        up_conv_7 = self.up_conv_5(layer_6)
+        up_conv_7 = self.up_conv_7(layer_6)
         cat_3 = torch.cat((CenterCrop((up_conv_7.shape[2], up_conv_7.shape[3]))(layer_2), up_conv_7), dim=1)
         layer_7 = self.conv_7(cat_3)
 
-        up_conv_8 = self.up_conv_5(layer_7)
+        up_conv_8 = self.up_conv_8(layer_7)
         cat_4 = torch.cat((CenterCrop((up_conv_8.shape[2], up_conv_8.shape[3]))(layer_1), up_conv_8), dim=1)
         layer_8 = self.conv_8(cat_4)
 

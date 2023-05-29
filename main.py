@@ -1,33 +1,113 @@
-from core import Model
-from utils import *
+from core import *
+from unet import UNet
+from train import train_model
+
+import torch
 
 
 def main(args):
-    model = Model(detection=Detection, depth=Depth, args=args, colors=colors)
-    model.inference()
-    model.preprocess()
-    model.crop()
-    # model.crop()
-    # model.preprocess()
+    epochs = 30
+    batch_size = 4
+    lr = 1e-5
+    scale = 0.5
+    val = 10.0
+    amp = False
+    classes = 21
+    bilinear = False
 
-    model.postprocess()
-    model.ordered_paint()
-    # model.final_filter()
+    dataset = VOCDataset()
 
-    # save_image(model.gray_image, 'gray_image.png')
-    # save_image(model.thresh_image, 'thresh_image.png')
-    # save_image(model.edge, 'edge.png')
-    # save_image(model.closed_edge_image, 'closed_edge_image.png')
-    # save_image(model.contours_image, 'contours_image.png')
-    save_image(model.depth_image, 'depth_output.png')
-    save_image(model.processing_image, 'normalized_depth_output.png')
-    save_image(model.ordered_image, 'ordered_image.png')
-    # save_image(model.blur_image, 'blur_image.png')
-    save_image(model.K_masking_image, 'K_masking_image.png')
-    save_image(model.G_masking_image, 'G_masking_image.png')
-    # save_image(model.filtered_K_masking_image, 'filtered_K_masking_image.png')
-    # save_image(model.filtered_G_masking_image, 'filtered_G_masking_image.png')
-    save_images(model.names, model.crop_images)
+    model = UNet(n_channels=3, n_classes=classes, bilinear=bilinear)
+    model = model.to(memory_format=torch.channels_last)
+
+    # if args.load:
+    #     state_dict = torch.load(args.load, map_location=device)
+    #     del state_dict['mask_values']
+    #     model.load_state_dict(state_dict)
+
+    model.to(device=device)
+    try:
+        train_model(
+            model=model,
+            epochs=epochs,
+            batch_size=batch_size,
+            learning_rate=lr,
+            device=device,
+            img_scale=scale,
+            val_percent=val / 100,
+            amp=amp,
+            dataset=dataset
+        )
+    except torch.cuda.OutOfMemoryError:
+        torch.cuda.empty_cache()
+        model.use_checkpointing()
+        train_model(
+            model=model,
+            epochs=epochs,
+            batch_size=batch_size,
+            learning_rate=lr,
+            device=device,
+            img_scale=scale,
+            val_percent=val / 100,
+            amp=amp,
+            dataset=dataset
+        )
+
+
+
+# def main(args):
+#     unet = UNet().to(device)
+#     dataset = VOCDataset()
+#     loader = DataLoader(dataset=dataset, batch_size=4, shuffle=False)
+#
+#     fn_loss = torch.nn.BCEWithLogitsLoss().to(device)
+#     optim = torch.optim.Adam(unet.parameters(), lr=1e-3)
+#
+#     start = 1
+#     epoch = 30
+#
+#     for epoch in range(start, epoch + 1):
+#         unet.train()
+#
+#         for batch, data in enumerate(loader):
+#             label = data['label'].to(device)
+#             inputs = data['input'].to(device)
+#             output = unet(inputs)
+#
+#             optim.zero_grad()
+#             loss = fn_loss(output, label)
+#             loss.backward()
+#             optim.step()
+#
+#             print(f'{batch} / {len(loader)}', end='\r')
+#
+#         print(loss.item())
+#         print()
+#
+#     torch.save(unet.state_dict(), '')
+#
+#     unet = UNet().to(device)
+#     unet.load_state_dict(torch.load('model.pth'))
+#     dataset = VOCDataset()
+#     loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
+#
+#     start = 1
+#     epoch = 1
+#     unet.eval()
+#     for epoch in range(start, epoch + 1):
+#         for batch, data in enumerate(loader):
+#             inputs = data['input'].to(device)
+#             output = unet(inputs)
+#             break
+#
+#         out = to_numpy(output)
+#
+#         # loss_arr += [loss.item()]
+#
+#
+# # model = Model(detection=Detection, depth=Depth, args=args, colors=colors)
+# # model.run()
+# # save_all(model)
 
 
 if __name__ == '__main__':
