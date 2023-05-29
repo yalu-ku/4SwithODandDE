@@ -6,7 +6,7 @@ from collections import defaultdict
 
 os.environ["OMP_NUM_THREADS"] = '8'  # noqa
 sys.path.append(f'{os.getcwd()}/ultralytics')  # noqa
-sys.path.append(f'{os.getcwd()}/ZoeDepth')  # noqa
+# sys.path.append(f'{os.getcwd()}/ZoeDepth')  # noqa
 sys.path.append(f'{os.getcwd()}/Pytorch-UNet')  # noqa
 
 import cv2
@@ -15,7 +15,7 @@ from PIL import Image
 
 from ultralytics import YOLO  # noqa
 from ultralytics.yolo.utils.plotting import colors  # noqa
-from zoedepth.utils.misc import colorize  # noqa
+# from zoedepth.utils.misc import colorize  # noqa
 
 from .model import Model
 from .unet import UNet, device
