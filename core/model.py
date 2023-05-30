@@ -55,6 +55,7 @@ class Model:
     def crop(self):
         detections = self.detection.result.boxes.data.detach().cpu().numpy()
 
+        o_depth_img = self.depth_image
         depth_img = self.processing_image
         crop_images = []
         for detection in detections:
@@ -71,7 +72,8 @@ class Model:
                      centroid=centroid,
                      original_img=self.original_img[t:b, l:r].copy(),
                      gray_img=cv2.cvtColor(self.original_img[t:b, l:r].copy(), cv2.COLOR_BGR2GRAY),
-                     depth_img=depth_img[t:b, l:r]))
+                     norm_depth_img=depth_img[t:b, l:r].astype(np.uint8),
+                     depth_img=o_depth_img[t:b, l:r]))
 
         self.crop_images = sorted(crop_images, key=lambda x: x['depth_value'])
 
@@ -118,11 +120,18 @@ class Model:
 
     def postprocess(self):
         for image in self.crop_images:
+
+            if image['depth_img'].max() < 5:
+                continue
+
             height = image['original_img'].shape[0]
             width = image['original_img'].shape[1]
 
             canvas = np.full((height, width, 3), (0, 0, 0), dtype=np.uint8)
-            canvas[:, :] = image['original_img'].copy()
+            oi = image['original_img'].copy()
+            de = (image['depth_img'] / 255).reshape(height, width, -1)
+            image['apply_depth'] = (oi * de).astype(np.uint8)
+            canvas[:, :] = image['apply_depth'].copy()
 
             kmeans = KMeans(n_clusters=3, n_init='auto')
             gmm = GaussianMixture(n_components=3)
@@ -146,31 +155,39 @@ class Model:
 
             image['fusion'] = fusion_img.copy().clip(min=0, max=255).astype(np.uint8)
 
-            fusion_img = ((fusion_img - fusion_img.min()) / (fusion_img.max() - fusion_img.min()) * 255).astype(
-                np.uint8)
+            #            fusion_img = ((fusion_img - fusion_img.min()) / (fusion_img.max() - fusion_img.min()) * 255).astype(
+            #                np.uint8)
+            #
+            #            image['normalized_fusion'] = fusion_img.copy()
+            #
+            image['fusion_mean_masking'] = np.where(fusion_img > fusion_img.mean(), fusion_img, 0).astype(np.uint8)
+            #
+            # image['fmm_depth_fusion'] = (
+            #         image['fusion_mean_masking'].copy().astype(int) + image['depth_img'].copy().astype(int)).clip(
+            #     min=0, max=255).astype(np.uint8)
 
-            image['normalized_fusion'] = fusion_img.copy()
-
-            image['fusion_mean_masking'] = np.where(fusion_img > fusion_img.mean(), fusion_img, 0)
-
-            image['fmm_depth_fusion'] = (
-                    image['fusion_mean_masking'].copy().astype(int) + image['depth_img'].copy().astype(int)).clip(
-                min=0, max=255).astype(np.uint8)
+            # print('-------------------------------------------------------')
+            # print(f"image['fusion_mean_masking'].shape : {type(image['fusion_mean_masking'][0,0])}")
+            # print(f"image['norm_depth_img'].shape : {type(image['norm_depth_img'][0,0])}")
+            # print('-------------------------------------------------------')
+            # exit()
 
             image['fmm_depth_fusion'] = cv2.addWeighted(image['fusion_mean_masking'].copy(), 0.35,
-                                                        image['depth_img'].copy().astype(np.uint8), 1, 0)
-
-            cv2.imwrite('fmm.png', image['fmm_depth_fusion'])
-
+                                                        image['norm_depth_img'].copy().astype(np.uint8), 1, 0)
+            #
+            #            cv2.imwrite('fmm.png', image['fmm_depth_fusion'])
+            #
             canvas = np.full((height, width), 0, dtype=np.uint8)
             canvas[:, :] = image['fmm_depth_fusion'].copy()
+
+            # canvas = np.full((height, width), 0, dtype=np.uint8)
+            # canvas[:, :] = image['fusion'].copy()
 
             kmeans = KMeans(n_clusters=2, n_init='auto')
             gmm = GaussianMixture(n_components=2)
 
             km_cluster_labels = kmeans.fit_predict(canvas.reshape(-1, 1))
             gmm_cluster_labels = gmm.fit_predict(canvas.reshape(-1, 1))
-
 
             km_clustered_image = np.zeros((height, width), dtype=np.uint8)
             gmm_clustered_image = np.zeros((height, width), dtype=np.uint8)
@@ -200,6 +217,8 @@ class Model:
         K_masking_canvas = np.zeros(canvas.shape, dtype=np.uint8)
         G_masking_canvas = np.zeros(canvas.shape, dtype=np.uint8)
         for idx, image in enumerate(self.crop_images):
+            if image['depth_img'].max() < 5:
+                continue
             cls = image['cls']
             color = self.colors(cls, True)
             cv2.putText(canvas, str(idx + 1), image['ltrb'][:2], cv2.FONT_HERSHEY_PLAIN, 3, color, 2)

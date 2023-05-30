@@ -6,8 +6,8 @@ from collections import defaultdict
 
 os.environ["OMP_NUM_THREADS"] = '8'  # noqa
 sys.path.append(f'{os.getcwd()}/ultralytics')  # noqa
-# sys.path.append(f'{os.getcwd()}/ZoeDepth')  # noqa
-sys.path.append(f'{os.getcwd()}/Pytorch-UNet')  # noqa
+sys.path.append(f'{os.getcwd()}/ZoeDepth')  # noqa
+# sys.path.append(f'{os.getcwd()}/Pytorch-UNet')  # noqa
 
 import cv2
 import torch
@@ -15,13 +15,16 @@ from PIL import Image
 
 from ultralytics import YOLO  # noqa
 from ultralytics.yolo.utils.plotting import colors  # noqa
-# from zoedepth.utils.misc import colorize  # noqa
+from zoedepth.utils.misc import colorize  # noqa
 
 from .model import Model
+
 from .unet import UNet, device
-from .dataset import VOCDataset, DataLoader
+# from .dataset import VOCDataset, DataLoader
 
 output_prefix = Path('outputs')
+f_path = Path('mask_images')
+f_path.mkdir(exist_ok=True)
 
 
 def to_numpy(x):
@@ -99,24 +102,34 @@ def parse_args():
     return args
 
 
-def save_all(model):
-    save_image(model.depth_image, 'depth_output.png')
-    save_image(model.processing_image, 'normalized_depth_output.png')
-    save_image(model.ordered_image, 'ordered_image.png')
-    save_image(model.K_masking_image, 'K_masking_image.png')
-    save_image(model.G_masking_image, 'G_masking_image.png')
-    save_images(model.names, model.crop_images)
+def save_all(_model):
+    save_image(_model.depth_image, 'depth_output.png')
+    save_image(_model.processing_image, 'normalized_depth_output.png')
+    save_image(_model.ordered_image, 'ordered_image.png')
+    save_image(_model.K_masking_image, 'K_masking_image.png')
+    save_image(_model.G_masking_image, 'G_masking_image.png')
+    save_images(_model.names, _model.crop_images)
 
 
-def save_image(image, f_name):
-    name = Path(f_name).stem
-    cv2.imwrite(str(output_prefix / f_name), image)
-    print(f'{name} result saved as `{f_name}`')
+def save_mask(_model):
+    path = Path(f_path) / output_prefix.stem
+    cv2.imwrite(str(path) + '.png', _model.G_masking_image)
+
+
+#     print(f'{name} result saved as `{f_name}`')
+#     save_image(model.K_masking_image, 'K_masking_image.png')
+
+
+def save_image(image, name):
+    cv2.imwrite(str(output_prefix / name), image)
+    print(f'{name} result saved as `{name}`')
 
 
 def save_images(name, images):
     classes = defaultdict(int)
     for img in images:
+        if img['depth_img'].max() < 5:
+            continue
         c = img['cls']
         classes[c] += 1
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_origin.png'), img['original_img'])
@@ -126,14 +139,16 @@ def save_images(name, images):
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_G_blur.png'), img['G_blur'])
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_K_blur.png'), img['K_blur'])
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_fusion.png'), img['fusion'])
-        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_normalized_fusion.png'),
-                    img['normalized_fusion'])
-        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_fusion_mean_masking.png'),
-                    img['fusion_mean_masking'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_apply_depth.png'), img['apply_depth'])
+#        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_normalized_fusion.png'),
+#                    img['normalized_fusion'])
+#        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_fusion_mean_masking.png'),
+#                    img['fusion_mean_masking'])
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_KMean.png'), img['F_KMean'])
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_GMM.png'), img['F_GMM'])
 
 
 __all__ = (
-    'Detection', 'Depth', 'parse_args', 'save_all', 'save_images', 'save_image', 'colors', 'Model',
-    'VOCDataset', 'DataLoader', 'device', 'to_numpy')
+    'Detection', 'Depth', 'parse_args', 'save_all', 'save_images', 'save_image', 'colors', 'Model', 'device',
+    'to_numpy', 'save_mask')
+# 'VOCDataset', 'DataLoader', 'device', 'to_numpy', 'save_mask')

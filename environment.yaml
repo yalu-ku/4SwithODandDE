@@ -15,6 +15,7 @@ dependencies:
   - PyYAML
   - requests
   - scipy
+  - scikit-learn
   - pandas
   - seaborn
   - psutil
