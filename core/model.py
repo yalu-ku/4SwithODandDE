@@ -121,7 +121,7 @@ class Model:
     def postprocess(self):
         for image in self.crop_images:
 
-            if image['depth_img'].max() < 5:
+            if image['depth_img'].max() < 20:
                 continue
 
             height = image['original_img'].shape[0]
@@ -217,7 +217,7 @@ class Model:
         K_masking_canvas = np.zeros(canvas.shape, dtype=np.uint8)
         G_masking_canvas = np.zeros(canvas.shape, dtype=np.uint8)
         for idx, image in enumerate(self.crop_images):
-            if image['depth_img'].max() < 5:
+            if image['depth_img'].max() < 20:
                 continue
             cls = image['cls']
             color = self.colors(cls, True)

@@ -128,7 +128,7 @@ def save_image(image, name):
 def save_images(name, images):
     classes = defaultdict(int)
     for img in images:
-        if img['depth_img'].max() < 5:
+        if img['depth_img'].max() < 20:
             continue
         c = img['cls']
         classes[c] += 1
