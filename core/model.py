@@ -101,7 +101,7 @@ class Model:
         crop_images = []
         for detection in detections:
             *box, conf, cls = detection
-            if cls not in changedict:
+            if (cls+1) not in changedict:
                 continue
             if conf < 0.6:
                 continue
