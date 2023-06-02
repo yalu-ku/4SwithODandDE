@@ -105,7 +105,7 @@ def save_all(_model):
     save_image(_model.ordered_image, 'ordered_image.png')
     f_name = 'masking_image.png'
     name = Path(f_name).stem
-    _model.masking_image.save('mask_images/'+str(output_prefix.parent.stem)+'.png')
+    _model.masking_image.save('mask_images/'+str(output_prefix.stem)+'.png')
     _model.masking_image.save(str(output_prefix / f_name))
     print(f'{name} result saved as `{f_name}`')
     # save_image(_model.masking_image, 'masking_image.png')
