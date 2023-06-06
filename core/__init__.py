@@ -106,14 +106,15 @@ def save_all(_model):
     save_image(_model.depth_image, 'depth_output.png')
     save_image(_model.processing_image, 'normalized_depth_output.png')
     save_image(_model.ordered_image, 'ordered_image.png')
-    save_image(_model.K_masking_image, 'K_masking_image.png')
-    save_image(_model.G_masking_image, 'G_masking_image.png')
+#     save_image(_model.K_masking_image, 'K_masking_image.png')
+#     save_image(_model.G_masking_image, 'G_masking_image.png')
     save_images(_model.names, _model.crop_images)
 
 
 def save_mask(_model):
     path = Path(f_path) / output_prefix.stem
-    cv2.imwrite(str(path) + '.png', _model.G_masking_image)
+    _model.K_masking_image.save(str(path) + '.png')
+#    cv2.imwrite(str(path) + '.png', _model.G_masking_image)
 
 
 #     print(f'{name} result saved as `{f_name}`')

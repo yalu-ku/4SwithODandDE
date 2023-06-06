@@ -1,8 +1,50 @@
 import cv2
 import numpy as np
-
+from PIL import Image
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
+
+
+changedict = {5: 1,
+              2: 2,
+              15: 3,
+              9: 4,
+              40: 5,
+              6: 6,
+              3: 7,
+              16: 8,
+              57: 9,
+              20: 10,
+              61: 11,
+              17: 12,
+              18: 13,
+              4: 14,
+              1: 15,
+              59: 16,
+              19: 17,
+              58: 18,
+              7: 19,
+              63: 20}
+
+
+def make_colormap(num=256):
+    def bit_get(val, idx):
+        return (val >> idx) & 1
+
+    colormap = np.zeros((num, 3), dtype=int)
+    ind = np.arange(num, dtype=int)
+
+    for shift in reversed(list(range(8))):
+        for channel in range(3):
+            colormap[:, channel] |= bit_get(ind, channel) << shift
+        ind >>= 3
+
+    return colormap
+
+
+idxs = [i for i in changedict]
+cmap = make_colormap(256).tolist()
+palette = [value for color in cmap for value in color]
 
 
 class Model:
@@ -60,6 +102,8 @@ class Model:
         crop_images = []
         for detection in detections:
             *box, conf, cls = detection
+            if (cls+1) not in changedict:
+                continue
             if conf < 0.6:
                 continue
             l, t, r, b = map(int, box)
@@ -214,8 +258,9 @@ class Model:
 
     def ordered_paint(self):
         canvas = self.detection.plot(label=False)
-        K_masking_canvas = np.zeros(canvas.shape, dtype=np.uint8)
-        G_masking_canvas = np.zeros(canvas.shape, dtype=np.uint8)
+        h, w, _ = canvas.shape
+        K_masking_canvas = np.zeros((h, w), dtype=np.uint8)
+        G_masking_canvas = np.zeros((h, w), dtype=np.uint8)
         for idx, image in enumerate(self.crop_images):
             if image['depth_img'].max() < 20:
                 continue
@@ -226,17 +271,21 @@ class Model:
             if image['F_KMean_mask']:
                 box = K_masking_canvas[t:b, l:r]
                 for g_max in image['F_KMean_mask']:
-                    box[image['F_KMean'] == g_max] = color
+                    box[image['F_KMean'] == g_max] = changedict[cls + 1]
                 K_masking_canvas[t:b, l:r] = box
             if image['F_GMM_mask']:
                 box = G_masking_canvas[t:b, l:r]
                 for g_max in image['F_GMM_mask']:
-                    box[image['F_GMM'] == g_max] = color
+                    box[image['F_GMM'] == g_max] = changedict[cls + 1]
                 G_masking_canvas[t:b, l:r] = box
 
         self.ordered_image = canvas
-        self.K_masking_image = K_masking_canvas
-        self.G_masking_image = G_masking_canvas
+        self.K_masking_image = Image.fromarray(K_masking_canvas).convert('P')
+        self.K_masking_image.putpalette(palette)
+        self.G_masking_image = Image.fromarray(G_masking_canvas).convert('P')
+        self.G_masking_image.putpalette(palette)
+#        self.K_masking_image = K_masking_canvas
+#        self.G_masking_image = G_masking_canvas
 
     def final_filter(self):
         self.filtered_K_masking_image = self.final_median(self.K_masking_image)
