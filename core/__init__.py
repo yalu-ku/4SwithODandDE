@@ -106,6 +106,13 @@ def save_all(_model):
     save_image(_model.depth_image, 'depth_output.png')
     save_image(_model.processing_image, 'normalized_depth_output.png')
     save_image(_model.ordered_image, 'ordered_image.png')
+    save_image(_model.K_masking_image, 'K_masking_image.png',is_pil=True)
+    save_image(_model.G_masking_image, 'G_masking_image.png',is_pil=True)
+    save_image(_model.K_masking_crf, 'K_masking_image_crf.png.png',is_pil=True)
+    save_image(_model.G_masking_crf, 'G_masking_image_crf.png.png',is_pil=True)
+    save_image(_model.K_masking_filtered_crf, 'K_masking_image_filtered_crf.png',is_pil=True)
+    save_image(_model.G_masking_filtered_crf, 'G_masking_image_filtered_crf.png',is_pil=True)
+    # save_image(_model.filtered_dcrf_image, 'final_dcrf_image.png')
 #     save_image(_model.K_masking_image, 'K_masking_image.png')
 #     save_image(_model.G_masking_image, 'G_masking_image.png')
     save_images(_model.names, _model.crop_images)
@@ -113,7 +120,10 @@ def save_all(_model):
 
 def save_mask(_model):
     path = Path(f_path) / output_prefix.stem
-    _model.K_masking_image.save(str(path) + '.png')
+    _model.K_masking_filtered_crf.save(str(path) + '.png')
+    # _model.dcrf_image.save(str(path) + '_crf.png')
+    # _model.filtered_dcrf_image.save(str(path) + '_filtered_crf.png')
+    # _model.filtered_dcrf_image.save(str(path) + '_filtered_crf.png')
 #    cv2.imwrite(str(path) + '.png', _model.G_masking_image)
 
 
@@ -121,8 +131,11 @@ def save_mask(_model):
 #     save_image(model.K_masking_image, 'K_masking_image.png')
 
 
-def save_image(image, name):
-    cv2.imwrite(str(output_prefix / name), image)
+def save_image(image, name, is_pil=False):
+    if is_pil:
+        image.save(str(output_prefix / name))
+    else:
+        cv2.imwrite(str(output_prefix / name), image)
     print(f'{name} result saved as `{name}`')
 
 
@@ -143,8 +156,10 @@ def save_images(name, images):
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_apply_depth.png'), img['apply_depth'])
 #        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_normalized_fusion.png'),
 #                    img['normalized_fusion'])
-#        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_fusion_mean_masking.png'),
-#                    img['fusion_mean_masking'])
+        cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_fusion_mean_masking.png'),
+                   img['fusion_mean_masking'])
+        # cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_fmm_depth_fusion.png'),
+        #            img['fmm_depth_fusion'])
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_KMean.png'), img['F_KMean'])
         cv2.imwrite(str(output_prefix / f'{name[c]}_{str(classes[c]).zfill(4)}_GMM.png'), img['F_GMM'])
 

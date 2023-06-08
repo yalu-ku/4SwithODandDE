@@ -4,6 +4,8 @@ from PIL import Image
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 
+import pydensecrf.densecrf as dcrf
+from pydensecrf.utils import unary_from_labels
 
 changedict = {5: 1,
               2: 2,
@@ -64,6 +66,15 @@ class Model:
         self.K_masking_image = None
         self.G_masking_image = None
         self.selected_cluster = None
+        self.K_masking_canvas = None
+        self.G_masking_canvas = None
+        self.masking_canvas = None
+        # self.dcrf_image = None
+        # self.filtered_dcrf_image = None
+        self.K_masking_filtered_crf = None
+        self.G_masking_filtered_crf = None
+        self.K_masking_crf = None
+        self.G_masking_crf = None
 
         self.filtered_K_masking_image = None
         self.filtered_G_masking_image = None
@@ -74,6 +85,8 @@ class Model:
         self.crop()
         self.postprocess()
         self.ordered_paint()
+        self.post_crf()
+        self.final_filter()
 
     def inference(self):
         self.detection(self.src, save=self.save)
@@ -102,7 +115,7 @@ class Model:
         crop_images = []
         for detection in detections:
             *box, conf, cls = detection
-            if (cls+1) not in changedict:
+            if (cls + 1) not in changedict:
                 continue
             if conf < 0.6:
                 continue
@@ -171,17 +184,23 @@ class Model:
             height = image['original_img'].shape[0]
             width = image['original_img'].shape[1]
 
-            canvas = np.full((height, width, 3), (0, 0, 0), dtype=np.uint8)
-            oi = image['original_img'].copy()
-            de = (image['depth_img'] / 255).reshape(height, width, -1)
+            # canvas = np.full((height, width, 3), (0, 0, 0), dtype=np.uint8)
+            # oi = image['original_img'].copy()
+            # de = (image['depth_img'] / 255).reshape(height, width, -1)
+            # image['apply_depth'] = (oi * de).astype(np.uint8)
+            # canvas[:, :] = image['apply_depth'].copy()
+
+            canvas = np.full((height, width), 0, dtype=np.uint8)
+            oi = image['gray_img'].copy()
+            de = (image['depth_img'] / 255).reshape(height, width)
             image['apply_depth'] = (oi * de).astype(np.uint8)
             canvas[:, :] = image['apply_depth'].copy()
 
             kmeans = KMeans(n_clusters=3, n_init='auto')
             gmm = GaussianMixture(n_components=3)
 
-            km_cluster_labels = kmeans.fit_predict(canvas.reshape(-1, 3))
-            gmm_cluster_labels = gmm.fit_predict(canvas.reshape(-1, 3))
+            km_cluster_labels = kmeans.fit_predict(canvas.reshape(-1, 1))
+            gmm_cluster_labels = gmm.fit_predict(canvas.reshape(-1, 1))
 
             km_clustered_image = np.zeros((height, width), dtype=np.uint8)
             gmm_clustered_image = np.zeros((height, width), dtype=np.uint8)
@@ -279,14 +298,48 @@ class Model:
                     box[image['F_GMM'] == g_max] = changedict[cls + 1]
                 G_masking_canvas[t:b, l:r] = box
 
+        self.K_masking_canvas = K_masking_canvas
+        self.G_masking_canvas = G_masking_canvas
+        self.masking_canvas = K_masking_canvas
+
         self.ordered_image = canvas
         self.K_masking_image = Image.fromarray(K_masking_canvas).convert('P')
         self.K_masking_image.putpalette(palette)
         self.G_masking_image = Image.fromarray(G_masking_canvas).convert('P')
         self.G_masking_image.putpalette(palette)
-#        self.K_masking_image = K_masking_canvas
-#        self.G_masking_image = G_masking_canvas
+
+    #        self.K_masking_image = K_masking_canvas
+    #        self.G_masking_image = G_masking_canvas
+
+    def _final_filter(self, img):
+        # self.filtered_K_masking_image = self.final_median(self.K_masking_image)
+        img_png = Image.fromarray(self.median(np.array(img))).convert('P')
+        img_png.putpalette(palette)
+        return img_png
+        # self.filtered_dcrf_image = img_png
 
     def final_filter(self):
-        self.filtered_K_masking_image = self.final_median(self.K_masking_image)
-        self.filtered_G_masking_image = self.final_median(self.G_masking_image)
+        self.K_masking_filtered_crf = self._final_filter(self.K_masking_crf)
+        self.G_masking_filtered_crf = self._final_filter(self.G_masking_crf)
+
+    def post_crf(self):
+        self.K_masking_crf = self._post_crf(self.K_masking_canvas)
+        self.G_masking_crf = self._post_crf(self.G_masking_canvas)
+
+    def _post_crf(self, img):
+        # img = self.masking_canvas
+        h, w = img.shape
+        dcrf_model = dcrf.DenseCRF2D(w, h, 21)
+
+        unary = unary_from_labels(img, 21, gt_prob=0.65, zero_unsure=False)
+
+        dcrf_model.setUnaryEnergy(unary)
+        dcrf_model.addPairwiseGaussian(sxy=(3, 3), compat=3)
+        dcrf_model.addPairwiseBilateral(sxy=80, srgb=13, rgbim=self.original_img, compat=10)
+
+        Q = dcrf_model.inference(5)
+        _map = np.argmax(Q, axis=0).reshape((h, w)).astype(np.uint8)
+        img_png = Image.fromarray(_map).convert('P')
+        img_png.putpalette(palette)
+        # self.dcrf_image = img_png
+        return img_png
