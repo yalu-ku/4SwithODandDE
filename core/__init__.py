@@ -7,6 +7,7 @@ from collections import defaultdict
 os.environ["OMP_NUM_THREADS"] = '8'  # noqa
 sys.path.append(f'{os.getcwd()}/ultralytics')  # noqa
 sys.path.append(f'{os.getcwd()}/ZoeDepth')  # noqa
+sys.path.append(f'{os.getcwd()}/yolo_cam')  # noqa
 # sys.path.append(f'{os.getcwd()}/Pytorch-UNet')  # noqa
 
 import cv2
@@ -61,7 +62,10 @@ class Depth:
         self.result = None
 
     def __call__(self, src, save=False):
-        image = Image.open(src)
+        if type(src) == str:
+            image = Image.open(src)
+        else:
+            image = Image.fromarray(cv2.cvtColor(src,cv2.COLOR_BGR2RGB))
         self.result = self.model.infer_pil(image)
         if save:
             self.save()
@@ -100,6 +104,7 @@ def parse_args():
 
 
 def save_all(_model):
+    save_image(_model.cam_image, 'cam_output.png')
     save_image(_model.depth_image, 'depth_output.png')
     save_image(_model.processing_image, 'normalized_depth_output.png')
     save_image(_model.ordered_image, 'ordered_image.png')

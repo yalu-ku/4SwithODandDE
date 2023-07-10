@@ -58,7 +58,7 @@ import torch
 def main(args):
     model = Model(detection=Detection, depth=Depth, args=args, colors=colors)
     model.run()
-    save_all(model)
+    # save_all(model)
 
 
 if __name__ == '__main__':
