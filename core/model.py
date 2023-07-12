@@ -1,12 +1,12 @@
+import os
+from pathlib import Path
+
 import cv2
 import numpy as np
 from PIL import Image
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 from skimage.segmentation import slic, mark_boundaries
-
-from yolo_cam.eigen_cam import EigenCAM
-from yolo_cam.utils.image import show_cam_on_image
 
 changedict = {5: 1,
               2: 2,
@@ -54,7 +54,6 @@ class Model:
     def __init__(self, detection, depth, args, colors):
         self.detection = detection(args.od)
         self.target_layers = [self.detection.model.model.model[-4]]
-        self.cam = EigenCAM(self.detection, self.target_layers, task='od')
         self.depth = depth(args.de)
         self.src = args.source
         self.save = args.save
@@ -94,20 +93,46 @@ class Model:
         # converted_img = cv2.cvtColor(self.normalized_depth_img, cv2.COLOR_GRAY2BGR)
         # converted_img = cv2.cvtColor(converted_img, cv2.COLOR_BGR2HSV)
 
-        depth_img = cv2.cvtColor(self.normalized_depth_img, cv2.COLOR_BGRA2BGR)
-        # depth_img = cv2.cvtColor(depth_img, cv2.COLOR_GRAY2RGB)
+        # Source image selection
+        stem = Path(self.src).stem
+        s_name_1, source_image_1 = "rgb", cv2.cvtColor(self.original_img, cv2.COLOR_BGRA2BGR)
+        s_name_2, source_image_2 = "depth-map",cv2.cvtColor(self.depth_image, cv2.COLOR_GRAY2RGB)
+        s_name_3, source_image_3 = "normalized-depth-map",cv2.cvtColor(self.normalized_depth_img, cv2.COLOR_GRAY2RGB)
 
         n_segments = 100
 
-        spi = slic(depth_img, n_segments=n_segments)
+        os.makedirs(f'SLIC/{stem}', exist_ok=True)
 
-        for i in range(n_segments):
-            
-        print(np.unique(spi))
+        spi = slic(source_image_1, n_segments=n_segments)
+        output_1 = self.original_img.copy()
+        for i in range(1, n_segments + 1):
+            idx = np.argwhere(spi == i)
+            if len(idx):
+                output_1[idx[:,0],idx[:,1]] = output_1[idx[:,0],idx[:,1]].mean(axis=0).astype(np.uint8)
+
+        cv2.imwrite(f'SLIC/{stem}/spimi-{s_name_1}.png', output_1)
+
+        spi = slic(source_image_2, n_segments=n_segments)
+        output_2 = self.original_img.copy()
+        for i in range(1, n_segments + 1):
+            idx = np.argwhere(spi == i)
+            if len(idx):
+                output_2[idx[:,0],idx[:,1]] = output_2[idx[:,0],idx[:,1]].mean(axis=0).astype(np.uint8)
+        cv2.imwrite(f'SLIC/{stem}/spimi-{s_name_2}.png', output_2)
+
+        spi = slic(source_image_3, n_segments=n_segments)
+        output_3 = self.original_img.copy()
+        for i in range(1, n_segments + 1):
+            idx = np.argwhere(spi == i)
+            if len(idx):
+                output_3[idx[:,0],idx[:,1]] = output_3[idx[:,0],idx[:,1]].mean(axis=0).astype(np.uint8)
+        cv2.imwrite(f'SLIC/{stem}/spimi-{s_name_3}.png', output_3)
+        # print(np.unique(spi))
 
         # spim = mark_boundaries(depth_img, spi)
         # spimi = np.uint8(spim * 255)
-        cv2.imwrite(f'spimi.png', spi)
+        # cv2.imwrite(f'spimi.png', spi)
+
 
         # # set parameters for superpixel segmentation
         # num_superpixels = 300  # desired number of superpixels
@@ -182,7 +207,7 @@ class Model:
         crop_images = []
         for detection in detections:
             *box, conf, cls = detection
-            if (cls+1) not in changedict:
+            if (cls + 1) not in changedict:
                 continue
             if conf < 0.6:
                 continue
@@ -222,8 +247,8 @@ class Model:
     #     cv2.imwrite('cropped_image.png', canvas)
 
     def preprocess(self):
-        self.depth_img = cv2.cvtColor(self.depth.plot(), cv2.COLOR_BGRA2GRAY)
-        depth_img = self.depth_img.copy()
+        self.depth_image = cv2.cvtColor(self.depth.plot(), cv2.COLOR_BGRA2GRAY)
+        depth_img = self.depth_image.copy()
         height, width = depth_img.shape
         kernel = np.zeros((height, width))
         th = int(height * 1)  # <Param 1> Default : 1
@@ -284,15 +309,7 @@ class Model:
     def postprocess(self):
         cnt = 0
         for image in self.crop_images:
-            target_image = cv2.cvtColor(np.uint8(image['depth_img']), cv2.COLOR_GRAY2RGB)
-            spi = slic(target_image, n_segments=4)
-            spim = mark_boundaries(target_image, spi)
-            spimi = np.uint8(spim*255)
-            cnt += 1
-            cv2.imwrite(f'spimi{cnt}.png', spimi)
-
-
-
+            pass
             # height = image['original_img'].shape[0]
             # width = image['original_img'].shape[1]
             #
