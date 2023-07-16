@@ -7,6 +7,7 @@ from PIL import Image
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 from skimage.segmentation import slic, mark_boundaries
+import supervision as sv
 
 changedict = {5: 1,
               2: 2,
@@ -76,8 +77,10 @@ class Model:
 
         self.filtered_K_masking_image = None
         self.filtered_G_masking_image = None
-
+        self.detected_image = None
         self.cropped_image = None
+
+        self.box_annotator = sv.BoxAnnotator()
 
     def run(self):
         self.inference()
@@ -90,94 +93,107 @@ class Model:
         # self.ordered_paint()
 
     def task(self):
+        # h, w = self.normalized_depth_img
         # converted_img = cv2.cvtColor(self.normalized_depth_img, cv2.COLOR_GRAY2BGR)
         # converted_img = cv2.cvtColor(converted_img, cv2.COLOR_BGR2HSV)
 
         # Source image selection
         stem = Path(self.src).stem
-        s_name_1, source_image_1 = "rgb", cv2.cvtColor(self.original_img, cv2.COLOR_BGRA2BGR)
-        s_name_2, source_image_2 = "depth-map",cv2.cvtColor(self.depth_image, cv2.COLOR_GRAY2RGB)
-        s_name_3, source_image_3 = "normalized-depth-map",cv2.cvtColor(self.normalized_depth_img, cv2.COLOR_GRAY2RGB)
+        # s_name_1, source_image_1 = "rgb", cv2.cvtColor(self.original_img, cv2.COLOR_BGRA2BGR)
+        # s_name_2, source_image_2 = "depth-map", cv2.cvtColor(self.depth_image, cv2.COLOR_GRAY2RGB)
+        # s_name_3, source_image_3 = "normalized-depth-map", cv2.cvtColor(self.normalized_depth_img, cv2.COLOR_GRAY2RGB)
+
+        s_name, source_image = "depth-map", cv2.cvtColor(self.normalized_depth_img, cv2.COLOR_GRAY2RGB)
 
         n_segments = 100
 
         os.makedirs(f'SLIC/{stem}', exist_ok=True)
 
-        spi = slic(source_image_1, n_segments=n_segments)
-        output_1 = self.original_img.copy()
+        # spi = slic(source_image_1, n_segments=n_segments)
+        # output_1 = self.original_img.copy()
+        # for i in range(1, n_segments + 1):
+        #     idx = np.argwhere(spi == i)
+        #     if len(idx):
+        #         output_1[idx[:, 0], idx[:, 1]] = output_1[idx[:, 0], idx[:, 1]].mean(axis=0).astype(np.uint8)
+        #
+        # cv2.imwrite(f'SLIC/{stem}/spimi-{s_name_1}.png', output_1)
+        #
+        # spi = slic(source_image_2, n_segments=n_segments)
+        # output_2 = self.original_img.copy()
+        # for i in range(1, n_segments + 1):
+        #     idx = np.argwhere(spi == i)
+        #     if len(idx):
+        #         output_2[idx[:, 0], idx[:, 1]] = output_2[idx[:, 0], idx[:, 1]].mean(axis=0).astype(np.uint8)
+        # cv2.imwrite(f'SLIC/{stem}/spimi-{s_name_2}.png', output_2)
+
+        spi = slic(source_image, n_segments=n_segments)
+        # output_3 = self.original_img.copy()
+        output = self.normalized_depth_img.copy()
+        # output_3 = self.normalized_depth_img.copy()
         for i in range(1, n_segments + 1):
             idx = np.argwhere(spi == i)
             if len(idx):
-                output_1[idx[:,0],idx[:,1]] = output_1[idx[:,0],idx[:,1]].mean(axis=0).astype(np.uint8)
-
-        cv2.imwrite(f'SLIC/{stem}/spimi-{s_name_1}.png', output_1)
-
-        spi = slic(source_image_2, n_segments=n_segments)
-        output_2 = self.original_img.copy()
-        for i in range(1, n_segments + 1):
-            idx = np.argwhere(spi == i)
-            if len(idx):
-                output_2[idx[:,0],idx[:,1]] = output_2[idx[:,0],idx[:,1]].mean(axis=0).astype(np.uint8)
-        cv2.imwrite(f'SLIC/{stem}/spimi-{s_name_2}.png', output_2)
-
-        spi = slic(source_image_3, n_segments=n_segments)
-        output_3 = self.original_img.copy()
-        for i in range(1, n_segments + 1):
-            idx = np.argwhere(spi == i)
-            if len(idx):
-                output_3[idx[:,0],idx[:,1]] = output_3[idx[:,0],idx[:,1]].mean(axis=0).astype(np.uint8)
-        cv2.imwrite(f'SLIC/{stem}/spimi-{s_name_3}.png', output_3)
-        # print(np.unique(spi))
-
-        # spim = mark_boundaries(depth_img, spi)
-        # spimi = np.uint8(spim * 255)
-        # cv2.imwrite(f'spimi.png', spi)
+                output[idx[:, 0], idx[:, 1]] = output[idx[:, 0], idx[:, 1]].mean(axis=0).astype(np.uint8)
+        cv2.imwrite(f'SLIC/{stem}/spimi-{s_name}.png', output)
+        cv2.imwrite(f'SLIC/{stem}/depth-map.png', self.depth_image)
+        cv2.imwrite(f'SLIC/{stem}/normalized-depth-map.png', self.normalized_depth_img)
+        cv2.imwrite(f'SLIC/{stem}/origin.png', self.original_img)
+        cv2.imwrite(f'SLIC/{stem}/detection.png', self.detected_image)
 
 
-        # # set parameters for superpixel segmentation
-        # num_superpixels = 300  # desired number of superpixels
-        # num_iterations = 8  # number of pixel level iterations. The higher, the better quality
-        # prior = 3  # for shape smoothing term. must be [0, 5]
-        # num_levels = 4
-        # num_histogram_bins = 5  # number of histogram bins
-        # height, width, channels = converted_img.shape
-        #
-        # src = cv2.GaussianBlur(src, (5, 5), 0)
-        #
-        # slic = cv2.ximgproc.createSuperpixelSLIC()
-        # # initialize SEEDS algorithm
-        # seeds = cv2.ximgproc.createSuperpixelSEEDS(width, height, channels, num_superpixels, num_levels, prior,
-        #                                            num_histogram_bins)
-        #
-        # seeds.iterate(converted_img, num_iterations)
-        #
-        # # get number of superpixel
-        # num_of_superpixels_result = seeds.getNumberOfSuperpixels()
-        # print('Final number of superpixels: %d' % num_of_superpixels_result)
-        #
-        # # retrieve the segmentation result
-        # labels = seeds.getLabels()  # height x width matrix. Each component indicates the superpixel index of the corresponding pixel position
-        #
-        # print(labels)
-        # # draw contour
-        # mask = seeds.getLabelContourMask(False)
-        # cv2.imwrite('seed.png', mask)
-        #
-        # color_img = np.zeros((height, width, 3), np.uint8)
-        # color_img[:] = (0, 0, 255)
-        # mask_inv = cv2.bitwise_not(mask)
-        #
-        # # result_bg = cv2.bitwise_and(self.normalized_depth_img, self.normalized_depth_img, mask=mask_inv)
-        # result_bg = cv2.bitwise_and(self.original_img, self.original_img, mask=mask_inv)
-        # # result_bg = cv2.cvtColor(result_bg, cv2.COLOR_GRAY2BGR)
-        # result_fg = cv2.bitwise_and(color_img, color_img, mask=mask)
-        # print(f'result_bg: {result_bg.shape}')
-        # print(f'result_fg: {result_fg.shape}')
-        # result = cv2.add(result_bg, result_fg)
-        # cv2.imwrite('ColorCodedWindow.png', result)
+        # gray_scale_img = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
+        # cv2.imwrite(f'SLIC/{stem}/spimi-gray.png', gray_scale_img)
+    # print(np.unique(spi))
+
+    # spim = mark_boundaries(depth_img, spi)
+    # spimi = np.uint8(spim * 255)
+    # cv2.imwrite(f'spimi.png', spi)
+
+    # # set parameters for superpixel segmentation
+    # num_superpixels = 300  # desired number of superpixels
+    # num_iterations = 8  # number of pixel level iterations. The higher, the better quality
+    # prior = 3  # for shape smoothing term. must be [0, 5]
+    # num_levels = 4
+    # num_histogram_bins = 5  # number of histogram bins
+    # height, width, channels = converted_img.shape
+    #
+    # src = cv2.GaussianBlur(src, (5, 5), 0)
+    #
+    # slic = cv2.ximgproc.createSuperpixelSLIC()
+    # # initialize SEEDS algorithm
+    # seeds = cv2.ximgproc.createSuperpixelSEEDS(width, height, channels, num_superpixels, num_levels, prior,
+    #                                            num_histogram_bins)
+    #
+    # seeds.iterate(converted_img, num_iterations)
+    #
+    # # get number of superpixel
+    # num_of_superpixels_result = seeds.getNumberOfSuperpixels()
+    # print('Final number of superpixels: %d' % num_of_superpixels_result)
+    #
+    # # retrieve the segmentation result
+    # labels = seeds.getLabels()  # height x width matrix. Each component indicates the superpixel index of the corresponding pixel position
+    #
+    # print(labels)
+    # # draw contour
+    # mask = seeds.getLabelContourMask(False)
+    # cv2.imwrite('seed.png', mask)
+    #
+    # color_img = np.zeros((height, width, 3), np.uint8)
+    # color_img[:] = (0, 0, 255)
+    # mask_inv = cv2.bitwise_not(mask)
+    #
+    # # result_bg = cv2.bitwise_and(self.normalized_depth_img, self.normalized_depth_img, mask=mask_inv)
+    # result_bg = cv2.bitwise_and(self.original_img, self.original_img, mask=mask_inv)
+    # # result_bg = cv2.cvtColor(result_bg, cv2.COLOR_GRAY2BGR)
+    # result_fg = cv2.bitwise_and(color_img, color_img, mask=mask)
+    # print(f'result_bg: {result_bg.shape}')
+    # print(f'result_fg: {result_fg.shape}')
+    # result = cv2.add(result_bg, result_fg)
+    # cv2.imwrite('ColorCodedWindow.png', result)
 
     def inference(self):
         self.detection(self.src, save=self.save)
+        self.detected_image = self.detection.plot(label=False)
 
         self.names = self.detection.result.names
         self.depth(self.src, save=self.save)
@@ -250,14 +266,26 @@ class Model:
         self.depth_image = cv2.cvtColor(self.depth.plot(), cv2.COLOR_BGRA2GRAY)
         depth_img = self.depth_image.copy()
         height, width = depth_img.shape
-        kernel = np.zeros((height, width))
-        th = int(height * 1)  # <Param 1> Default : 1
-        x = np.full((width, th), np.linspace(0, 255, th)).transpose()
-        kernel[height - th:, :] = x
-        normalized_depth = depth_img - kernel
-        normalized_depth = np.uint8(normalized_depth.clip(min=0, max=255))
-        self.normalized_depth_img = normalized_depth
 
+        lowest = 0
+        for detection in self.detection.result.boxes.data.detach().cpu().numpy():
+            *box, conf, cls = detection
+            if conf < 0.6:
+                continue
+            lowest = max(lowest, box[-1])
+
+        if lowest < height * 0.8:
+            kernel = np.zeros((height, width))
+            th = int(height * 1)  # <Param 1> Default : 1
+            x = np.full((width, th), np.linspace(0, 255, th)).transpose()
+            kernel[height - th:, :] = x
+            normalized_depth = depth_img - kernel
+            normalized_depth = np.uint8(normalized_depth.clip(min=0, max=255))
+            self.normalized_depth_img = normalized_depth
+        else:
+            self.normalized_depth_img = self.depth_image
+
+        cv2.imwrite('depth_img.png', self.normalized_depth_img)
         # depth_img = cv2.cvtColor(np.uint8(normalized_depth), cv2.COLOR_GRAY2RGB)
         #
         # spi = slic(depth_img, n_segments=100)
